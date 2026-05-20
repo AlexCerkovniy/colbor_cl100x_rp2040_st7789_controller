@@ -2,7 +2,9 @@
 #include <Adafruit_ST7789.h> // Hardware-specific library for ST7789
 #include <SPI.h>
 #include "RP2040_PWM.h"     // Library RP2040_PWM
-#include "Fonts/FreeMonoBoldOblique12pt7b.h"
+#include "color_temp_table.h"
+#include "Fonts/FreeMonoBold9pt7b.h"
+#include "Fonts/FreeMonoBold24pt7b.h"
 
 #define FAN_PWM_PIN      29 //PWM6B
 #define FAN_SD_PIN       28
@@ -38,13 +40,18 @@ uint32_t serial_buffer_size = 0;
 bool serial_buffer_ready = false;
 
 //Control
+int color_temp_index = 0;
 bool converter_enabled = false;
 int white_brightness, white_brightness_last = 0;
 int yellow_brightness, yellow_brightness_last = 0;
 int global_brightness, global_brightness_last = 0;
 int fan_speed, fan_speed_last = 0;
 
-Adafruit_ST7789 tft = Adafruit_ST7789(&SPI, TFT_DC, TFT_CS, TFT_RST);
+//Stats
+int supply_voltage_mv = 0;
+int supply_current_ma = 0;
+
+Adafruit_ST7789 tft = Adafruit_ST7789(&SPI, TFT_CS, TFT_DC, TFT_RST);
 
 void setup() {
   delay(1000);
@@ -73,9 +80,8 @@ void setup() {
   SPI.begin();
   tft.init(170, 320);
   tft.setRotation(1);
-  digitalWrite(TFT_BL, true);
-  tft.fillScreen(0xFFFF);
   tft.fillScreen(0);
+  digitalWrite(TFT_BL, true);
   startup_screen();
 }
 
@@ -150,9 +156,21 @@ void pwm_update(RP2040_PWM *pwm, int pin, int freq_hz, int new_duty, int *last_d
 }
 
 void startup_screen(void) {
-  tft.setFont(&FreeMonoBoldOblique12pt7b);
-  tft.fillRect(0, 0, 100, 100, 0xAAAA);
-  tft.setCursor(0, 12);
+  tft.setFont(&FreeMonoBold9pt7b);
+  tft.fillRect(0, 0, tft.width(), 20, 0xFFFF);
+  tft.setCursor(5, 14);
+  tft.setTextColor(0);
+  tft.printf("%.2d.%.2dV", supply_voltage_mv/1000, (supply_voltage_mv%1000)/10);
+
+  // Dimm percents
+  tft.setFont(&FreeMonoBold24pt7b);
   tft.setTextColor(0xFFFF);
-  tft.print("Hello World!");
+  tft.setCursor(100, 75);
+  tft.printf("%d%%", global_brightness);
+
+  // Color temp
+  tft.setFont(&FreeMonoBold24pt7b);
+  tft.setTextColor(0xFFFF);
+  tft.setCursor(100, 130);
+  tft.printf("%dK", color_temp_table[color_temp_index]);
 }
