@@ -155,6 +155,11 @@ void pwm_update(RP2040_PWM *pwm, int pin, int freq_hz, int new_duty, int *last_d
   }
 }
 
+void draw_value_window(int x, int y, int w, int h) {
+  tft.setFont(&FreeMonoBold9pt7b);
+  tft.fillRect(x, y, w, 9/* Font height */ + 2 * 2, 0xFFFF);
+}
+
 void startup_screen(void) {
   tft.setFont(&FreeMonoBold9pt7b);
   tft.fillRect(0, 0, tft.width(), 20, 0xFFFF);
