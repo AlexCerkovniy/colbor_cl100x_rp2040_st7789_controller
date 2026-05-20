@@ -1,4 +1,7 @@
-#include "RP2040_PWM.h"
+#include <Adafruit_GFX.h>    // Core graphics library
+#include <Adafruit_ST7789.h> // Hardware-specific library for ST7789
+#include <SPI.h>
+#include "RP2040_PWM.h"     // Library RP2040_PWM
 
 #define FAN_PWM_PIN      29 //PWM6B
 #define FAN_SD_PIN       28
@@ -7,10 +10,22 @@
 #define GLOBAL_PWM_PIN   27 //PWM5B 
 #define CONVERTER_EN_PIN 26
 
+#define TFT_MISO  0
+#define TFT_MOSI  3
+#define TFT_SCLK  2
+#define TFT_CS    4  // Chip select control pin
+#define TFT_DC    5  // Data Command control pin
+#define TFT_RST   6  // Reset pin (could connect to Arduino RESET pin)
+#define TFT_BL    7  // LED back-light
+
 /* Define control PWM frequencies */
 #define YELLOW_PWM_FREQ_HZ 30000
 #define WHITE_PWM_FREQ_HZ  30000
 #define GLOBAL_PWM_FREQ_HZ 20000
+
+/* Define temp. sensor */
+#define TEMP_SENSOR_RESISTANCE         10000
+#define TEMP_SENSOR_PULL_UP_RESISTANCE 1000
 
 RP2040_PWM* yellow_pwm;
 RP2040_PWM* white_pwm;
@@ -29,10 +44,13 @@ int yellow_brightness, yellow_brightness_last = 0;
 int global_brightness, global_brightness_last = 0;
 int fan_speed, fan_speed_last = 0;
 
+Adafruit_ST7789 tft = Adafruit_ST7789(TFT_CS, TFT_DC, TFT_MOSI, TFT_SCLK, TFT_RST);
+
 void setup() {
   delay(1000);
   Serial.begin(115200);
   pinMode(CONVERTER_EN_PIN, OUTPUT);
+  pinMode(TFT_BL, OUTPUT);
   digitalWrite(CONVERTER_EN_PIN, false);
 
   /* Initialize PWM (crutch - after init pwm set up to 29% not applied somehow)*/
@@ -49,6 +67,10 @@ void setup() {
   global_pwm->setPWM_Int(GLOBAL_PWM_PIN, GLOBAL_PWM_FREQ_HZ, 0);
 
   fan_pwm = new RP2040_PWM(FAN_PWM_PIN, 25000, 100);
+
+  tft.init(170, 320);
+  tft.fillScreen(0xFFFF);
+  digitalWrite(TFT_BL, true);
 }
 
 void loop() {
