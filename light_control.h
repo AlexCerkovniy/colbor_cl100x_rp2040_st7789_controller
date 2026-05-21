@@ -13,7 +13,7 @@ class LightControl {
     int white_level, white_level_last = 0;
     int yellow_level, yellow_level_last = 0;
     int dimm_level, dimm_level_last = 0;
-    int fan_speed, fan_speed_last = 0;
+    int fan_speed, fan_speed_last = 100;
     int color_temp_index = 0;
 
   public:
