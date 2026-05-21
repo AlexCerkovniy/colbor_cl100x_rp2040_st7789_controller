@@ -2,7 +2,7 @@
 #define FAN_SD_PIN       28
 #define YELLOW_PWM_PIN   15 //PWM7B
 #define WHITE_PWM_PIN    14 //PWM7A
-#define GLOBAL_PWM_PIN   27 //PWM5B 
+#define DIMM_PWM_PIN     27 //PWM5B 
 #define CONVERTER_EN_PIN 26
 
 /* Display connection */
