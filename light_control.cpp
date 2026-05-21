@@ -1,5 +1,6 @@
 #include "light_control.h"
 #include "light_config.h"
+#include "color_temp_table.h"
 
 static void pwm_update(RP2040_PWM *pwm, int pin, int freq_hz, int new_duty, int *last_duty) {
   if(new_duty != *last_duty) {
@@ -29,7 +30,7 @@ void LightControl::begin(void) {
   this->dimm_pwm->setPWM_Int(DIMM_PWM_PIN, DIMM_PWM_FREQ_HZ, 30);
   this->dimm_pwm->setPWM_Int(DIMM_PWM_PIN, DIMM_PWM_FREQ_HZ, 0);
 
-  fan_pwm = new RP2040_PWM(FAN_PWM_PIN, 25000, 100);
+  fan_pwm = new RP2040_PWM(FAN_PWM_PIN, 25000, 40);
 }
 
 void LightControl::tick(void) {
@@ -51,9 +52,8 @@ void LightControl::enable(bool state) {
   }
 }
 
-void LightControl::toggle(void) {
-  this->enabled ^= true;
-  this->enable(this->enabled);
+bool LightControl::is_enabled(void) {
+  return this->enabled;
 }
 
 void LightControl::set_yellow(int level) {
@@ -94,4 +94,18 @@ void LightControl::set_fan_speed(int level) {
 
 int LightControl::get_fan_speed(void) {
   return this->fan_speed;
+}
+
+void LightControl::set_color_temperature(int kelvin) {
+  this->color_temp = constrain(kelvin, 2700, 6500);
+  int index = (this->color_temp - 2700) / 100;
+  this->set_white(color_temp_table[index].white_level);
+  this->set_yellow(color_temp_table[index].yellow_level);
+  Serial.print("Set color temp. to ");
+  Serial.print(this->color_temp);
+  Serial.println("K");
+}
+
+int LightControl::get_color_temperature(void) {
+  return this->color_temp;
 }

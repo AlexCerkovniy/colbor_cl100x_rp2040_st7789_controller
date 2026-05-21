@@ -13,14 +13,14 @@ class LightControl {
     int white_level, white_level_last = 0;
     int yellow_level, yellow_level_last = 0;
     int dimm_level, dimm_level_last = 0;
-    int fan_speed, fan_speed_last = 100;
-    int color_temp_index = 0;
+    int fan_speed, fan_speed_last = 0;
+    int color_temp = 0;
 
   public:
     void begin(void);
     void tick(void);
     void enable(bool state);
-    void toggle(void);
+    bool is_enabled(void);
     void set_yellow(int level);
     int get_yellow(void);
     void set_white(int level);
@@ -29,4 +29,6 @@ class LightControl {
     int get_dimm(void);
     void set_fan_speed(int level);
     int get_fan_speed(void);
+    void set_color_temperature(int kelvin);
+    int get_color_temperature(void);
 };

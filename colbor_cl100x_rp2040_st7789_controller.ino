@@ -60,6 +60,9 @@ void setup() {
   ITimer0.attachInterruptInterval(TIMER0_INTERVAL_MS * 1000, TimerHandler0);
 
   light.begin();
+  light.set_color_temperature(5600);
+  light.set_fan_speed(61);
+
   SPI.setTX(TFT_MOSI);
   SPI.setSCK(TFT_SCLK);
   SPI.begin();
@@ -87,7 +90,10 @@ void loop() {
 
   if(serial_buffer_ready) {
     if(serial_buffer[0] == 'c') {
-      light.toggle();
+      light.enable(light.is_enabled() ^ true);
+      if(!light.is_enabled()) {
+        light.set_fan_speed(60);
+      }
     }
     else if(serial_buffer[0] == 'y') {
       light.set_yellow(atoi((char *)&serial_buffer[1]));
@@ -140,7 +146,7 @@ void main_screen(void) {
   tft.setFont(&FreeMonoBold24pt7b);
   tft.setTextColor(0xFFFF);
   tft.setCursor(100, 130);
-  //tft.printf("%dK", color_temp_table[color_temp_index]);
+  tft.printf("%dK", light.get_color_temperature());
 }
 
 static void button_callback(uint8_t button_id, button_callback_event_t event) {
@@ -149,11 +155,32 @@ static void button_callback(uint8_t button_id, button_callback_event_t event) {
   if(event == BTN_SHORT_PRESS) {
     if(button_id == SW1_UP) {
       light.set_dimm(light.get_dimm() + 5);
+      if(light.is_enabled()) {
+        light.set_fan_speed(map(light.get_dimm(), 0, 100, 60, 100));
+      }
     }
     else if(button_id == SW1_DOWN) {
       if(!(light.get_dimm() < 5)) {
         light.set_dimm(light.get_dimm() - 5);
+        if(light.is_enabled()) {
+          light.set_fan_speed(map(light.get_dimm(), 0, 100, 60, 100));
+        }
       }
+    }
+    else if(button_id == SW1_PRESS) {
+      light.enable(light.is_enabled() ^ true);
+      if(light.is_enabled()) {
+        light.set_fan_speed(map(light.get_dimm(), 0, 100, 60, 100));
+      }
+      else {
+        light.set_fan_speed(60);
+      }
+    }
+    else if(button_id == SW2_UP) {
+      light.set_color_temperature(light.get_color_temperature() + 100);
+    }
+    else if(button_id == SW2_DOWN) {
+      light.set_color_temperature(light.get_color_temperature() - 100);
     }
 
     screen_update = true;
