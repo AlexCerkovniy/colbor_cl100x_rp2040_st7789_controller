@@ -35,7 +35,7 @@ void LightControl::begin(void) {
 void LightControl::tick(void) {
   pwm_update(this->yellow_pwm, YELLOW_PWM_PIN, YELLOW_PWM_FREQ_HZ, this->yellow_level, &this->yellow_level_last);
   pwm_update(this->white_pwm, WHITE_PWM_PIN, WHITE_PWM_FREQ_HZ, this->white_level, &this->white_level_last);
-  pwm_update(this->dimm_pwm, DIMM_PWM_PIN, DIMM_PWM_FREQ_HZ, this->dimm_level, &this->dimm_level_last);
+  pwm_update(this->dimm_pwm, DIMM_PWM_PIN, DIMM_PWM_FREQ_HZ, map(this->dimm_level, 0, 100, 10, 100), &this->dimm_level_last);
   pwm_update(this->fan_pwm, FAN_PWM_PIN, 25000, this->fan_speed, &this->fan_speed_last);
 }
 
@@ -77,7 +77,7 @@ int LightControl::get_white(void) {
 }
 
 void LightControl::set_dimm(int level) {
-  this->dimm_level = map(level, 0, 100, 10, 100);
+  this->dimm_level = constrain(level, 0, 100);
   Serial.print("Set dimm. level to ");
   Serial.println(this->dimm_level);
 }

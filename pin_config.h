@@ -14,9 +14,7 @@
 #define TFT_BL           7  // LED back-light
 
 /* Buttons connection */
-#define SW1_UP_PIN       8
+#define SW1_UP_PIN       10
 #define SW1_DOWN_PIN     9
-#define SW1_PRESS_PIN    10
-#define SW2_UP_PIN       8
-#define SW2_DOWN_PIN     9
-#define SW2_PRESS_PIN    10
+#define SW2_UP_PIN       12
+#define SW2_DOWN_PIN     11

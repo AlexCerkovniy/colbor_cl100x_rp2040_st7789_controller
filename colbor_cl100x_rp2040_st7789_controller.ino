@@ -7,6 +7,11 @@
 #include "Fonts/FreeMonoBold9pt7b.h"
 #include "Fonts/FreeMonoBold24pt7b.h"
 #include "button.h"
+#include "TimerInterrupt_Generic.h"
+
+#define TIMER0_INTERVAL_MS (1)
+RPI_PICO_Timer ITimer0(0);
+bool TimerHandler0(struct repeating_timer *t);
 
 #define BUTTONS_COUNT 6
 
@@ -40,6 +45,7 @@ int supply_voltage_mv = 0;
 int supply_current_ma = 0;
 
 Adafruit_ST7789 tft = Adafruit_ST7789(&SPI, TFT_CS, TFT_DC, TFT_RST);
+bool screen_update = true;
 
 void setup() {
   delay(1000);
@@ -51,17 +57,17 @@ void setup() {
 		BTN_RegisterCallback(&buttons[btn].button, button_callback);
 	}
 
+  ITimer0.attachInterruptInterval(TIMER0_INTERVAL_MS * 1000, TimerHandler0);
+
   light.begin();
-
-
   SPI.setTX(TFT_MOSI);
   SPI.setSCK(TFT_SCLK);
   SPI.begin();
   tft.init(170, 320);
   tft.setRotation(1);
   tft.fillScreen(0);
+  delay(100);
   digitalWrite(TFT_BL, true);
-  startup_screen();
 }
 
 void loop() {
@@ -101,6 +107,7 @@ void loop() {
 
     serial_buffer_ready = false;
     serial_buffer_size = 0;
+    screen_update = true;
   }
 
   light.tick();
@@ -108,15 +115,15 @@ void loop() {
   for(uint32_t btn = 0; btn < BUTTONS_COUNT; btn++){
 		BTN_Main(&buttons[btn].button);
 	}
+
+  if(screen_update) {
+    screen_update = false;
+    main_screen();
+  }
 }
 
-
-void draw_value_window(int x, int y, int w, int h) {
-  tft.setFont(&FreeMonoBold9pt7b);
-  tft.fillRect(x, y, w, 9/* Font height */ + 2 * 2, 0xFFFF);
-}
-
-void startup_screen(void) {
+void main_screen(void) {
+  tft.fillScreen(0);
   tft.setFont(&FreeMonoBold9pt7b);
   tft.fillRect(0, 0, tft.width(), 20, 0xFFFF);
   tft.setCursor(5, 14);
@@ -137,5 +144,28 @@ void startup_screen(void) {
 }
 
 static void button_callback(uint8_t button_id, button_callback_event_t event) {
+  Serial.printf("Button ID =%d event = %d\r\n", button_id, event);
 
+  if(event == BTN_SHORT_PRESS) {
+    if(button_id == SW1_UP) {
+      light.set_dimm(light.get_dimm() + 5);
+    }
+    else if(button_id == SW1_DOWN) {
+      if(!(light.get_dimm() < 5)) {
+        light.set_dimm(light.get_dimm() - 5);
+      }
+    }
+
+    screen_update = true;
+  }
+}
+
+bool TimerHandler0(struct repeating_timer *t)
+{
+	(void) t;
+  /* Update timings for buttons library */
+	for(uint32_t btn = 0; btn < BUTTONS_COUNT; btn++){
+		BTN_Tick(&buttons[btn].button, 1);
+	}
+	return true;
 }
