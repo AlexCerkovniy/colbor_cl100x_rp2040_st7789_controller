@@ -20,6 +20,7 @@ class LightControl {
     void begin(void);
     void tick(void);
     void enable(bool state);
+    void toggle(void);
     void set_yellow(int level);
     int get_yellow(void);
     void set_white(int level);

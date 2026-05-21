@@ -3,6 +3,7 @@
 #include <SPI.h>
 #include "pin_config.h"
 #include "color_temp_table.h"
+#include "light_control.h"
 #include "Fonts/FreeMonoBold9pt7b.h"
 #include "Fonts/FreeMonoBold24pt7b.h"
 
@@ -15,6 +16,8 @@ uint8_t serial_buffer[128] = {0};
 uint32_t serial_buffer_size = 0;
 bool serial_buffer_ready = false;
 
+LightControl light = LightControl();
+
 //Stats
 int supply_voltage_mv = 0;
 int supply_current_ma = 0;
@@ -26,6 +29,7 @@ void setup() {
   Serial.begin(115200);
   pinMode(TFT_BL, OUTPUT);
 
+  light.begin();
 
 
   SPI.setTX(TFT_MOSI);
@@ -55,20 +59,19 @@ void loop() {
 
   if(serial_buffer_ready) {
     if(serial_buffer[0] == 'c') {
-      //digitalWrite(CONVERTER_EN_PIN, converter_enabled);
+      light.toggle();
     }
     else if(serial_buffer[0] == 'y') {
-      //yellow_brightness = constrain(atoi((char *)&serial_buffer[1]), 0, 100);
-      
+      light.set_yellow(atoi((char *)&serial_buffer[1]));
     }
     else if(serial_buffer[0] == 'w') {
-      //white_brightness = constrain(atoi((char *)&serial_buffer[1]), 0, 100);
+      light.set_white(atoi((char *)&serial_buffer[1]));
     }
     else if(serial_buffer[0] == 'g') {
-      //global_brightness = map(atoi((char *)&serial_buffer[1]), 0, 100, 10, 100);
+      light.set_dimm(atoi((char *)&serial_buffer[1]));
     }
     else if(serial_buffer[0] == 'f') {
-      //fan_speed = constrain(atoi((char *)&serial_buffer[1]), 0, 100);
+      light.set_fan_speed(atoi((char *)&serial_buffer[1]));
     }
     else {
       Serial.println("Unknown data");
@@ -77,6 +80,8 @@ void loop() {
     serial_buffer_ready = false;
     serial_buffer_size = 0;
   }
+
+  light.tick();
 }
 
 
@@ -96,7 +101,7 @@ void startup_screen(void) {
   tft.setFont(&FreeMonoBold24pt7b);
   tft.setTextColor(0xFFFF);
   tft.setCursor(100, 75);
-  //tft.printf("%d%%", global_brightness);
+  tft.printf("%d%%", light.get_dimm());
 
   // Color temp
   tft.setFont(&FreeMonoBold24pt7b);

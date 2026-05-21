@@ -41,6 +41,7 @@ void LightControl::tick(void) {
 
 void LightControl::enable(bool state) {
   this->enabled = state;
+  digitalWrite(CONVERTER_EN_PIN, this->enabled);
 
   if(state) {
     Serial.println("Converter enabled");
@@ -50,8 +51,13 @@ void LightControl::enable(bool state) {
   }
 }
 
+void LightControl::toggle(void) {
+  this->enabled ^= true;
+  this->enable(this->enabled);
+}
+
 void LightControl::set_yellow(int level) {
-  this->yellow_level = level;
+  this->yellow_level = constrain(level, 0, 100);
   Serial.print("Set yellow level to ");
   Serial.println(this->yellow_level);
 }
@@ -61,7 +67,7 @@ int LightControl::get_yellow(void) {
 }
 
 void LightControl::set_white(int level) {
-  this->white_level = level;
+  this->white_level = constrain(level, 0, 100);
   Serial.print("Set white level to ");
   Serial.println(this->white_level);
 }
@@ -71,7 +77,7 @@ int LightControl::get_white(void) {
 }
 
 void LightControl::set_dimm(int level) {
-  this->dimm_level = level;
+  this->dimm_level = map(level, 0, 100, 10, 100);
   Serial.print("Set dimm. level to ");
   Serial.println(this->dimm_level);
 }
@@ -81,7 +87,7 @@ int LightControl::get_dimm(void) {
 }
 
 void LightControl::set_fan_speed(int level) {
-  this->fan_speed = level;
+  this->fan_speed = constrain(level, 0, 100);
   Serial.print("Set fan speed to ");
   Serial.println(this->fan_speed);
 }
