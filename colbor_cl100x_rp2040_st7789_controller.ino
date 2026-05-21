@@ -6,6 +6,23 @@
 #include "light_control.h"
 #include "Fonts/FreeMonoBold9pt7b.h"
 #include "Fonts/FreeMonoBold24pt7b.h"
+#include "button.h"
+
+#define BUTTONS_COUNT 6
+
+static struct {
+  uint16_t button_id;
+	button_t button;
+} buttons[] = {
+  {.button_id = SW1_UP},
+  {.button_id = SW1_DOWN},
+  {.button_id = SW1_PRESS},
+  {.button_id = SW2_UP},
+  {.button_id = SW2_DOWN},
+  {.button_id = SW2_PRESS}
+};
+
+static void button_callback(uint8_t button_id, button_callback_event_t event);
 
 /* Define temp. sensor */
 #define TEMP_SENSOR_RESISTANCE         10000
@@ -28,6 +45,11 @@ void setup() {
   delay(1000);
   Serial.begin(115200);
   pinMode(TFT_BL, OUTPUT);
+
+  for(uint32_t btn = 0; btn < BUTTONS_COUNT; btn++){
+		BTN_Init(&buttons[btn].button, buttons[btn].button_id, 50, 0 /* Disabled */);
+		BTN_RegisterCallback(&buttons[btn].button, button_callback);
+	}
 
   light.begin();
 
@@ -82,6 +104,10 @@ void loop() {
   }
 
   light.tick();
+
+  for(uint32_t btn = 0; btn < BUTTONS_COUNT; btn++){
+		BTN_Main(&buttons[btn].button);
+	}
 }
 
 
@@ -108,4 +134,8 @@ void startup_screen(void) {
   tft.setTextColor(0xFFFF);
   tft.setCursor(100, 130);
   //tft.printf("%dK", color_temp_table[color_temp_index]);
+}
+
+static void button_callback(uint8_t button_id, button_callback_event_t event) {
+
 }
