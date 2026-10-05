@@ -7,7 +7,7 @@
 #include "Fonts/FreeMonoBold9pt7b.h"
 #include "Fonts/FreeMonoBold24pt7b.h"
 #include "button.h"
-#include "TimerInterrupt_Generic.h"
+#include "RPi_Pico_TimerInterrupt.h"
 
 #define TIMER0_INTERVAL_MS (1)
 RPI_PICO_Timer ITimer0(0);
