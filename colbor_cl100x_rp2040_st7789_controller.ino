@@ -5,6 +5,7 @@
 #include "color_temp_table.h"
 #include "light_control.h"
 #include "Fonts/FreeMonoBold9pt7b.h"
+#include "Fonts/FreeMonoBold12pt7b.h"
 #include "Fonts/FreeMonoBold24pt7b.h"
 #include "button.h"
 #include "RPi_Pico_TimerInterrupt.h"
@@ -50,20 +51,45 @@ bool screen_update = true;
 
 #define TFT_SPI_SPEED_HZ (50000000UL)
 
-/* Off-screen buffers used for flicker-free partial updates */
+/* Colors (RGB565) */
+#define RGB565(r, g, b)  ((uint16_t)((((r) & 0xF8) << 8) | (((g) & 0xFC) << 3) | ((b) >> 3)))
+#define COLOR_BG         0x0000
+#define COLOR_BLOCK      RGB565(44, 48, 56)    // slightly grey block background
+#define COLOR_LABEL      RGB565(160, 168, 180)
+#define COLOR_TRACK      RGB565(22, 24, 30)    // progress bar track
+#define COLOR_DIMM_FILL  RGB565(255, 200, 80)
+#define COLOR_ON         RGB565(30, 170, 70)   // light on indication
+#define COLOR_OFF_TEXT   RGB565(120, 126, 136)
+
+/* Layout (320x170 landscape) */
 #define VOLT_X 0
 #define VOLT_Y 0
 #define VOLT_W 120
 #define VOLT_H 20
-#define FIELD_X 100
-#define FIELD_W 220
-#define FIELD_H 48
-#define DIMM_Y  40  // baseline in field = 75 - 40
-#define TEMP_Y  95  // baseline in field = 130 - 95
-#define FIELD_BASELINE 35
 
+#define BLOCK_X          4
+#define BLOCK_W          312
+#define BLOCK_H          50
+#define DIMM_BLOCK_Y     26
+#define TEMP_BLOCK_Y     80
+#define STATUS_BLOCK_Y   134
+#define STATUS_BLOCK_H   32
+#define BLOCK_RADIUS     8
+#define BLOCK_PAD        10
+
+/* Progress bar inside a block (canvas coordinates) */
+#define BAR_X            BLOCK_PAD
+#define BAR_Y            30
+#define BAR_W            112
+#define BAR_H            8
+
+#define TEMP_MIN_K       2700
+#define TEMP_MAX_K       6500
+
+/* Off-screen buffers used for flicker-free partial updates.
+ * block_canvas is shared by all blocks (status block uses its first 32 rows). */
 GFXcanvas16 volt_canvas(VOLT_W, VOLT_H);
-GFXcanvas16 field_canvas(FIELD_W, FIELD_H);
+GFXcanvas16 block_canvas(BLOCK_W, BLOCK_H);
 
 void setup() {
   delay(1000);
@@ -150,14 +176,90 @@ void loop() {
   }
 }
 
-/* Render text into the canvas and push only that rectangle to the display */
-static void draw_field(int16_t x, int16_t y, const char *txt) {
-  field_canvas.fillScreen(0);
-  field_canvas.setFont(&FreeMonoBold24pt7b);
-  field_canvas.setTextColor(0xFFFF);
-  field_canvas.setCursor(0, FIELD_BASELINE);
-  field_canvas.print(txt);
-  tft.drawRGBBitmap(x, y, field_canvas.getBuffer(), FIELD_W, FIELD_H);
+/* Start a block: clear canvas to screen background, draw rounded block */
+static void block_begin(uint16_t h, uint16_t color) {
+  block_canvas.fillScreen(COLOR_BG);
+  block_canvas.fillRoundRect(0, 0, BLOCK_W, h, BLOCK_RADIUS, color);
+}
+
+/* Push the first h rows of the shared canvas to the display (partial update) */
+static void block_end(int16_t y, uint16_t h) {
+  tft.drawRGBBitmap(BLOCK_X, y, block_canvas.getBuffer(), BLOCK_W, h);
+}
+
+static void block_label(const char *txt) {
+  block_canvas.setFont(&FreeMonoBold9pt7b);
+  block_canvas.setTextColor(COLOR_LABEL);
+  block_canvas.setCursor(BLOCK_PAD, 20);
+  block_canvas.print(txt);
+}
+
+static void block_value_right(const char *txt) {
+  int16_t x1, y1;
+  uint16_t w, h;
+  block_canvas.setFont(&FreeMonoBold24pt7b);
+  block_canvas.setTextColor(0xFFFF);
+  block_canvas.getTextBounds(txt, 0, 0, &x1, &y1, &w, &h);
+  block_canvas.setCursor(BLOCK_W - BLOCK_PAD - x1 - w, 39);
+  block_canvas.print(txt);
+}
+
+static void draw_dimm_block(int dimm) {
+  char buf[16];
+  dimm = constrain(dimm, 0, 100);
+
+  block_begin(BLOCK_H, COLOR_BLOCK);
+  block_label("Dimming");
+
+  block_canvas.fillRoundRect(BAR_X, BAR_Y, BAR_W, BAR_H, BAR_H / 2, COLOR_TRACK);
+  int fill_w = dimm * BAR_W / 100;
+  if(fill_w >= BAR_H) {
+    block_canvas.fillRoundRect(BAR_X, BAR_Y, fill_w, BAR_H, BAR_H / 2, COLOR_DIMM_FILL);
+  }
+  else if(fill_w > 0) {
+    block_canvas.fillRect(BAR_X, BAR_Y, fill_w, BAR_H, COLOR_DIMM_FILL);
+  }
+
+  snprintf(buf, sizeof(buf), "%d%%", dimm);
+  block_value_right(buf);
+  block_end(DIMM_BLOCK_Y, BLOCK_H);
+}
+
+static void draw_temp_block(int kelvin) {
+  char buf[16];
+  kelvin = constrain(kelvin, TEMP_MIN_K, TEMP_MAX_K);
+
+  block_begin(BLOCK_H, COLOR_BLOCK);
+  block_label("Color temp.");
+
+  /* Warm (orange) -> cool (blue-white) gradient bar with position marker */
+  for(int i = 0; i < BAR_W; i++) {
+    int t = i * 255 / (BAR_W - 1);
+    uint8_t r = 255 - (85 * t) / 255;
+    uint8_t g = 150 + (55 * t) / 255;
+    uint8_t b = 50 + (205 * t) / 255;
+    block_canvas.drawFastVLine(BAR_X + i, BAR_Y, BAR_H, RGB565(r, g, b));
+  }
+  int marker = (kelvin - TEMP_MIN_K) * (BAR_W - 1) / (TEMP_MAX_K - TEMP_MIN_K);
+  block_canvas.fillRect(BAR_X + marker - 1, BAR_Y - 4, 3, BAR_H + 8, 0xFFFF);
+
+  snprintf(buf, sizeof(buf), "%dK", kelvin);
+  block_value_right(buf);
+  block_end(TEMP_BLOCK_Y, BLOCK_H);
+}
+
+static void draw_status_block(bool on) {
+  int16_t x1, y1;
+  uint16_t w, h;
+  const char *txt = on ? "ON" : "OFF";
+
+  block_begin(STATUS_BLOCK_H, on ? COLOR_ON : COLOR_BLOCK);
+  block_canvas.setFont(&FreeMonoBold12pt7b);
+  block_canvas.setTextColor(on ? 0xFFFF : COLOR_OFF_TEXT);
+  block_canvas.getTextBounds(txt, 0, 0, &x1, &y1, &w, &h);
+  block_canvas.setCursor((BLOCK_W - w) / 2 - x1, (STATUS_BLOCK_H - h) / 2 - y1);
+  block_canvas.print(txt);
+  block_end(STATUS_BLOCK_Y, STATUS_BLOCK_H);
 }
 
 /* Partial update: only fields whose value changed are redrawn */
@@ -166,6 +268,7 @@ void main_screen(void) {
   static int last_voltage_mv = -1;
   static int last_dimm = -1;
   static int last_temp = -1;
+  static int last_enabled = -1;
 
   if(first_draw) {
     first_draw = false;
@@ -187,17 +290,19 @@ void main_screen(void) {
   int dimm = light.get_dimm();
   if(dimm != last_dimm) {
     last_dimm = dimm;
-    char buf[16];
-    snprintf(buf, sizeof(buf), "%d%%", dimm);
-    draw_field(FIELD_X, DIMM_Y, buf);
+    draw_dimm_block(dimm);
   }
 
   int temp = light.get_color_temperature();
   if(temp != last_temp) {
     last_temp = temp;
-    char buf[16];
-    snprintf(buf, sizeof(buf), "%dK", temp);
-    draw_field(FIELD_X, TEMP_Y, buf);
+    draw_temp_block(temp);
+  }
+
+  int enabled = light.is_enabled() ? 1 : 0;
+  if(enabled != last_enabled) {
+    last_enabled = enabled;
+    draw_status_block(enabled);
   }
 }
 
