@@ -221,12 +221,9 @@ static void draw_dimm_block(int dimm) {
   block_begin(BLOCK_H, COLOR_BLOCK);
   block_label("Dimming");
 
-  block_canvas.fillRoundRect(BAR_X, BAR_Y, BAR_W, BAR_H, BAR_H / 2, COLOR_TRACK);
+  block_canvas.fillRect(BAR_X, BAR_Y, BAR_W, BAR_H, COLOR_TRACK);
   int fill_w = dimm * BAR_W / 100;
-  if(fill_w >= BAR_H) {
-    block_canvas.fillRoundRect(BAR_X, BAR_Y, fill_w, BAR_H, BAR_H / 2, COLOR_DIMM_FILL);
-  }
-  else if(fill_w > 0) {
+  if(fill_w > 0) {
     block_canvas.fillRect(BAR_X, BAR_Y, fill_w, BAR_H, COLOR_DIMM_FILL);
   }
 
@@ -240,7 +237,7 @@ static void draw_temp_block(int kelvin) {
   kelvin = constrain(kelvin, TEMP_MIN_K, TEMP_MAX_K);
 
   block_begin(BLOCK_H, COLOR_BLOCK);
-  block_label("Color temp.");
+  block_label("Warm");
 
   /* Warm (orange) -> cool (blue-white) gradient bar with position marker */
   for(int i = 0; i < BAR_W; i++) {
