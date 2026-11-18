@@ -61,25 +61,23 @@ bool screen_update = true;
 #define COLOR_ON         RGB565(30, 170, 70)   // light on indication
 #define COLOR_OFF_TEXT   RGB565(120, 126, 136)
 
-/* Layout (320x170 landscape) */
-#define VOLT_X 0
-#define VOLT_Y 0
-#define VOLT_W 120
-#define VOLT_H 20
-
+/* Layout (320x170 landscape): 4 px margins/gaps, 3 blocks fill the full height
+ * 4 + 56 + 4 + 56 + 4 + 42 + 4 = 170 */
 #define BLOCK_X          4
 #define BLOCK_W          312
-#define BLOCK_H          50
-#define DIMM_BLOCK_Y     26
-#define TEMP_BLOCK_Y     80
-#define STATUS_BLOCK_Y   134
-#define STATUS_BLOCK_H   32
+#define BLOCK_H          56
+#define DIMM_BLOCK_Y     4
+#define TEMP_BLOCK_Y     64
+#define STATUS_BLOCK_Y   124
+#define STATUS_BLOCK_H   42
 #define BLOCK_RADIUS     8
 #define BLOCK_PAD        10
+#define LABEL_BASELINE   24
+#define VALUE_BASELINE   44
 
 /* Progress bar inside a block (canvas coordinates) */
 #define BAR_X            BLOCK_PAD
-#define BAR_Y            30
+#define BAR_Y            34
 #define BAR_W            112
 #define BAR_H            8
 
@@ -88,7 +86,6 @@ bool screen_update = true;
 
 /* Off-screen buffers used for flicker-free partial updates.
  * block_canvas is shared by all blocks (status block uses its first 32 rows). */
-GFXcanvas16 volt_canvas(VOLT_W, VOLT_H);
 GFXcanvas16 block_canvas(BLOCK_W, BLOCK_H);
 
 void setup() {
@@ -190,7 +187,7 @@ static void block_end(int16_t y, uint16_t h) {
 static void block_label(const char *txt) {
   block_canvas.setFont(&FreeMonoBold9pt7b);
   block_canvas.setTextColor(COLOR_LABEL);
-  block_canvas.setCursor(BLOCK_PAD, 20);
+  block_canvas.setCursor(BLOCK_PAD, LABEL_BASELINE);
   block_canvas.print(txt);
 }
 
@@ -200,7 +197,7 @@ static void block_value_right(const char *txt) {
   block_canvas.setFont(&FreeMonoBold24pt7b);
   block_canvas.setTextColor(0xFFFF);
   block_canvas.getTextBounds(txt, 0, 0, &x1, &y1, &w, &h);
-  block_canvas.setCursor(BLOCK_W - BLOCK_PAD - x1 - w, 39);
+  block_canvas.setCursor(BLOCK_W - BLOCK_PAD - x1 - w, VALUE_BASELINE);
   block_canvas.print(txt);
 }
 
@@ -265,26 +262,13 @@ static void draw_status_block(bool on) {
 /* Partial update: only fields whose value changed are redrawn */
 void main_screen(void) {
   static bool first_draw = true;
-  static int last_voltage_mv = -1;
   static int last_dimm = -1;
   static int last_temp = -1;
   static int last_enabled = -1;
 
   if(first_draw) {
     first_draw = false;
-    tft.fillScreen(0);
-    // White top bar, static
-    tft.fillRect(0, 0, tft.width(), VOLT_H, 0xFFFF);
-  }
-
-  if(supply_voltage_mv != last_voltage_mv) {
-    last_voltage_mv = supply_voltage_mv;
-    volt_canvas.fillScreen(0xFFFF);
-    volt_canvas.setFont(&FreeMonoBold9pt7b);
-    volt_canvas.setTextColor(0);
-    volt_canvas.setCursor(5, 14);
-    volt_canvas.printf("%.2d.%.2dV", supply_voltage_mv/1000, (supply_voltage_mv%1000)/10);
-    tft.drawRGBBitmap(VOLT_X, VOLT_Y, volt_canvas.getBuffer(), VOLT_W, VOLT_H);
+    tft.fillScreen(COLOR_BG);
   }
 
   int dimm = light.get_dimm();
