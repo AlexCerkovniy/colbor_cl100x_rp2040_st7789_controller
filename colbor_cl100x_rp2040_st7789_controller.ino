@@ -34,6 +34,12 @@ static void button_callback(uint8_t button_id, button_callback_event_t event);
 /* Define temp. sensor */
 #define TEMP_SENSOR_RESISTANCE         10000
 #define TEMP_SENSOR_PULL_UP_RESISTANCE 1000
+/* Divider: 3V3 -> 1k -> TEMP_SENSOR_PIN <- NTC 10k <- GND (ADC ref is also 3V3) */
+#define TEMP_SENSOR_BETA               3950.0f  // NTC Beta value, check datasheet of your NTC
+#define TEMP_SENSOR_NOMINAL_C          25.0f    // temperature where NTC = TEMP_SENSOR_RESISTANCE
+#define TEMP_SENSOR_ADC_BITS           12
+#define TEMP_SENSOR_SAMPLES            16
+#define TEMP_SENSOR_PERIOD_MS          500
 
 //Serial buffering
 uint8_t serial_buffer[128] = {0};
@@ -49,7 +55,7 @@ int supply_current_ma = 0;
 Adafruit_ST7789 tft = Adafruit_ST7789(&SPI, TFT_CS, TFT_DC, TFT_RST);
 bool screen_update = true;
 
-#define TFT_SPI_SPEED_HZ (50000000UL)
+#define TFT_SPI_SPEED_HZ (80000000UL)
 
 /* Colors (RGB565) */
 #define RGB565(r, g, b)  ((uint16_t)((((r) & 0xF8) << 8) | (((g) & 0xFC) << 3) | ((b) >> 3)))
@@ -97,14 +103,41 @@ bool screen_update = true;
 GFXcanvas16 block_canvas(BLOCK_W, BLOCK_H);
 GFXcanvas16 small_canvas(SMALL_BLOCK_W, STATUS_BLOCK_H);
 
-/* Mock values until real measurements are wired in */
 int temperature_c = 0;
+/* Mock value until real measurement is wired in */
 int power_w = 0;
+
+/* Returns temperature in degrees C, or false if the sensor looks open/shorted */
+static bool read_temperature_c(int *celsius) {
+  const float adc_max = (float)((1 << TEMP_SENSOR_ADC_BITS) - 1);
+  uint32_t sum = 0;
+
+  for(int i = 0; i < TEMP_SENSOR_SAMPLES; i++) {
+    sum += analogRead(TEMP_SENSOR_PIN);
+  }
+  float adc = (float)sum / TEMP_SENSOR_SAMPLES;
+
+  /* Rail values mean shorted to GND (0) or open sensor (max) */
+  if(adc < 1.0f || adc > adc_max - 1.0f) {
+    return false;
+  }
+
+  /* Divider: Vpin = 3V3 * Rntc / (Rpullup + Rntc) */
+  float r_ntc = TEMP_SENSOR_PULL_UP_RESISTANCE * adc / (adc_max - adc);
+
+  /* Beta equation: 1/T = 1/T0 + ln(R/R0)/B */
+  float t0_k = TEMP_SENSOR_NOMINAL_C + 273.15f;
+  float t_k = 1.0f / (1.0f / t0_k + logf(r_ntc / TEMP_SENSOR_RESISTANCE) / TEMP_SENSOR_BETA);
+
+  *celsius = (int)roundf(t_k - 273.15f);
+  return true;
+}
 
 void setup() {
   delay(1000);
   Serial.begin(115200);
   pinMode(TFT_BL, OUTPUT);
+  analogReadResolution(TEMP_SENSOR_ADC_BITS);
 
   for(uint32_t btn = 0; btn < BUTTONS_COUNT; btn++){
 		BTN_Init(&buttons[btn].button, buttons[btn].button_id, 50, 500, BUTTONS_HOLD_PRESS_PERIOD_MS);
@@ -175,6 +208,16 @@ void loop() {
   }
 
   light.tick();
+
+  static uint32_t temp_sensor_timer = 0;
+  if(millis() - temp_sensor_timer >= TEMP_SENSOR_PERIOD_MS) {
+    temp_sensor_timer = millis();
+    int celsius;
+    if(read_temperature_c(&celsius) && celsius != temperature_c) {
+      temperature_c = celsius;
+      screen_update = true;
+    }
+  }
 
   for(uint32_t btn = 0; btn < BUTTONS_COUNT; btn++){
 		BTN_Main(&buttons[btn].button);
