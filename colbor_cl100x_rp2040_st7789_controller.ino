@@ -70,6 +70,14 @@ bool screen_update = true;
 #define TEMP_BLOCK_Y     64
 #define STATUS_BLOCK_Y   124
 #define STATUS_BLOCK_H   42
+/* Bottom row: three equal blocks (ON/OFF, temperature, power): 3*100 + 2*6 = 312 */
+#define SMALL_BLOCK_W    100
+#define SMALL_BLOCK_GAP  6
+#define POWER_BLOCK_X    (BLOCK_X)
+#define TEMP_C_BLOCK_X   (BLOCK_X + SMALL_BLOCK_W + SMALL_BLOCK_GAP)
+#define STATUS_BLOCK_X   (BLOCK_X + 2 * (SMALL_BLOCK_W + SMALL_BLOCK_GAP))
+#define TEMP_C_MAX       99
+#define POWER_W_MAX      150
 #define BLOCK_RADIUS     8
 #define BLOCK_PAD        10
 #define LABEL_BASELINE   24
@@ -87,6 +95,11 @@ bool screen_update = true;
 /* Off-screen buffers used for flicker-free partial updates.
  * block_canvas is shared by all blocks (status block uses its first 32 rows). */
 GFXcanvas16 block_canvas(BLOCK_W, BLOCK_H);
+GFXcanvas16 small_canvas(SMALL_BLOCK_W, STATUS_BLOCK_H);
+
+/* Mock values until real measurements are wired in */
+int temperature_c = 0;
+int power_w = 0;
 
 void setup() {
   delay(1000);
@@ -245,18 +258,36 @@ static void draw_temp_block(int kelvin) {
   block_end(TEMP_BLOCK_Y, BLOCK_H);
 }
 
-static void draw_status_block(bool on) {
+/* Bottom-row block: rounded background with text centered both ways */
+static void draw_small_block(int16_t x, uint16_t bg, uint16_t fg, const char *txt) {
   int16_t x1, y1;
   uint16_t w, h;
-  const char *txt = on ? "ON" : "OFF";
 
-  block_begin(STATUS_BLOCK_H, on ? COLOR_ON : COLOR_BLOCK);
-  block_canvas.setFont(&FreeMonoBold12pt7b);
-  block_canvas.setTextColor(on ? 0xFFFF : COLOR_OFF_TEXT);
-  block_canvas.getTextBounds(txt, 0, 0, &x1, &y1, &w, &h);
-  block_canvas.setCursor((BLOCK_W - w) / 2 - x1, (STATUS_BLOCK_H - h) / 2 - y1);
-  block_canvas.print(txt);
-  block_end(STATUS_BLOCK_Y, STATUS_BLOCK_H);
+  small_canvas.fillScreen(COLOR_BG);
+  small_canvas.fillRoundRect(0, 0, SMALL_BLOCK_W, STATUS_BLOCK_H, BLOCK_RADIUS, bg);
+  small_canvas.setFont(&FreeMonoBold12pt7b);
+  small_canvas.setTextColor(fg);
+  small_canvas.getTextBounds(txt, 0, 0, &x1, &y1, &w, &h);
+  small_canvas.setCursor((SMALL_BLOCK_W - w) / 2 - x1, (STATUS_BLOCK_H - h) / 2 - y1);
+  small_canvas.print(txt);
+  tft.drawRGBBitmap(x, STATUS_BLOCK_Y, small_canvas.getBuffer(), SMALL_BLOCK_W, STATUS_BLOCK_H);
+}
+
+static void draw_status_block(bool on) {
+  draw_small_block(STATUS_BLOCK_X, on ? COLOR_ON : COLOR_BLOCK,
+                   on ? 0xFFFF : COLOR_OFF_TEXT, on ? "ON" : "OFF");
+}
+
+static void draw_temp_c_block(int celsius) {
+  char buf[8];
+  snprintf(buf, sizeof(buf), "%dC", constrain(celsius, 0, TEMP_C_MAX));
+  draw_small_block(TEMP_C_BLOCK_X, COLOR_BLOCK, 0xFFFF, buf);
+}
+
+static void draw_power_block(int watts) {
+  char buf[8];
+  snprintf(buf, sizeof(buf), "%dW", constrain(watts, 0, POWER_W_MAX));
+  draw_small_block(POWER_BLOCK_X, COLOR_BLOCK, 0xFFFF, buf);
 }
 
 /* Partial update: only fields whose value changed are redrawn */
@@ -265,6 +296,8 @@ void main_screen(void) {
   static int last_dimm = -1;
   static int last_temp = -1;
   static int last_enabled = -1;
+  static int last_temp_c = -1;
+  static int last_power_w = -1;
 
   if(first_draw) {
     first_draw = false;
@@ -287,6 +320,16 @@ void main_screen(void) {
   if(enabled != last_enabled) {
     last_enabled = enabled;
     draw_status_block(enabled);
+  }
+
+  if(temperature_c != last_temp_c) {
+    last_temp_c = temperature_c;
+    draw_temp_c_block(temperature_c);
+  }
+
+  if(power_w != last_power_w) {
+    last_power_w = power_w;
+    draw_power_block(power_w);
   }
 }
 
