@@ -3,15 +3,15 @@
 #include "color_temp_table.h"
 
 static void converter_en(void) {
-    #define PWM_TIME_US           (4000)
-    #define PWM_PERIOD_US         (300)
-    #define PWM_DUTY_MAX          (60)
-    #define PWM_DUTY_MIN          (25)
+    #define PWM_TIME_US           (10000)
+    #define PWM_PERIOD_US         (500)
+    #define PWM_DUTY_MAX          (45)
+    #define PWM_DUTY_MIN          (10)
 
     uint32_t active_period_us = 0;
 
     /* Pre-charge step for soft-start capacitor */
-    uint32_t cycle = 3;
+    uint32_t cycle = 2;
     digitalWrite(CONVERTER_EN_PIN, true);
     while(cycle--) {
         delayMicroseconds(100);
