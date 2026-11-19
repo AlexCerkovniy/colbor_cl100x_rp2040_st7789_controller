@@ -147,7 +147,7 @@ void setup() {
   ITimer0.attachInterruptInterval(TIMER0_INTERVAL_MS * 1000, TimerHandler0);
 
   light.begin();
-  light.set_color_temperature(5600);
+  light.set_color_temperature(4600);
   light.set_fan_speed(61);
 
   SPI.setTX(TFT_MOSI);

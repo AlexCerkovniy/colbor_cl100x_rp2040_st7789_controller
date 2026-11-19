@@ -3,10 +3,10 @@
 #include "color_temp_table.h"
 
 static void converter_en(void) {
-    #define PWM_TIME_US           (10000)
-    #define PWM_PERIOD_US         (500)
-    #define PWM_DUTY_MAX          (45)
-    #define PWM_DUTY_MIN          (10)
+    #define PWM_TIME_US           (15000)
+    #define PWM_PERIOD_US         (750)
+    #define PWM_DUTY_MAX          (30)
+    #define PWM_DUTY_MIN          (5)
 
     uint32_t active_period_us = 0;
 
